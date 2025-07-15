@@ -1,4 +1,5 @@
 import os
+from os.path import join
 import torch
 from torch import optim
 from torch.optim.lr_scheduler import StepLR
@@ -11,6 +12,8 @@ from tools import concat_result
 
 class Solver(object):
     def __init__(self, config, train_loader, valid_loader, test_loader):
+        self.args=config
+        self.early_stop = config.early_stop
         self.unet = None
         self.optimizer = None
         self.device = torch.device('cuda:0')
@@ -127,7 +130,7 @@ class Solver(object):
             m.reset()
 
         with torch.no_grad():
-            result_dir = os.path.join(self.result_path, f'epoch_{epoch + 1}')
+            result_dir = join(self.result_path, f'epoch_{epoch + 1}')
             os.makedirs(result_dir, exist_ok=True)
             for i, (images, GT) in enumerate(loader):
                 images = images.to(self.device)
@@ -200,23 +203,47 @@ class Solver(object):
                 total_pil = Image.fromarray(total_img)  # 默认模式为 'RGB'
 
             # 保存拼接图像
-            total_pil.save(os.path.join(result_dir, f'batch_{batch_idx}_img_{idx}_concat.png'))
+            total_pil.save(join(result_dir, f'batch_{batch_idx}_img_{idx}_concat.png'))
 
-    def train(self):
-        best_score = 0.0
-        for epoch in range(1, self.num_epochs+1):
+    def train(self,args):
+        #如果保存了模型权重，则进行预训练
+        if args.pre_trained:
+            # Load checkpoint.   checkpoint相当于保存模型的参数，优化器参数，loss，epoch的文件夹
+            print('==> Resuming from checkpoint..')
+            checkpoint = torch.load(join(self.model_path,f"{self.model_type}_latest.pth"),
+                map_location=args.device)  #torch.load(args.outf + '%s/ResUNet_latest_model.pth' % args.pre_trained)
+            self.unet.load_state_dict(checkpoint['net'])
+            #net = net.to(device)
+            self.optimizer.load_state_dict(checkpoint['optimizer'])
+            args.start_epoch = checkpoint['epoch'] + 1
+
+
+        best = {'epoch': 0, 'score': 0.5}
+        trigger = 0                                             #初始化早停累加器
+        for epoch in range(args.start_epoch, self.num_epochs+1):
             train_res = self.train_epoch(self.train_loader)
             val_res   = self.validate_epoch(self.valid_loader, epoch)
 
-            print(f"epoch:{epoch} [Train] Loss: {train_res['loss']:.4f}  SE: {train_res['SE']:.4f}  SP: {train_res['SP']:.4f}  ACC: {train_res['acc']:.4f}  "
-                  f"F1: {train_res['DC']:.4f}  PC: {train_res['PC']:.4f}  IOU: {train_res['JS']:.4f}  AUPRC={train_res['AUPRC']:.4f}  AUROC={train_res['AUROC']:.4f}")
-            print(f"[Valid] Loss: {val_res['loss']:.4f}  SE: {val_res['SE']:.4f}  SP: {val_res['SP']:.4f}  ACC: {val_res['acc']:.4f}  "
-                f"F1: {val_res['DC']:.4f}  PC: {val_res['PC']:.4f}  IOU: {val_res['JS']:.4f}  AUPRC={val_res['AUPRC']:.4f}  AUROC={val_res['AUROC']:.4f}")
-
-            score = val_res['JS'] + val_res['DC']
-            if score > best_score:
-                best_score = score
-                torch.save(self.unet.state_dict(), os.path.join(self.model_path, f"{self.model_type}_best.pth"))
-                print(f"📌 Best model saved at epoch {epoch}, score={best_score:.4f}")
-
             self.scheduler.step()
+
+            print(f"epoch:{epoch} [Train] Loss: {train_res['loss']:.4f}  SE: {train_res['SE']:.4f}  SP: {train_res['SP']:.4f}  ACC: {train_res['acc']:.4f}  "
+                  f"F1: {train_res['DC']:.4f}  PC: {train_res['PC']:.4f}  IOU: {train_res['JS']:.4f}  PR: {train_res['AUPRC']:.4f}  AUROC: {train_res['AUROC']:.4f}")
+            print(f"[Valid] Loss: {val_res['loss']:.4f}  SE: {val_res['SE']:.4f}  SP: {val_res['SP']:.4f}  ACC: {val_res['acc']:.4f}  "
+                f"F1: {val_res['DC']:.4f}  PC: {val_res['PC']:.4f}  IOU: {val_res['JS']:.4f}  PR: {val_res['AUPRC']:.4f}  AUROC: {val_res['AUROC']:.4f}")
+
+            #保存当前epoch的模型（权重、优化器状态和epoch，可以在下一次接着训练）
+            state = {'net': self.unet.state_dict(), 'optimizer': self.optimizer.state_dict(), 'epoch': epoch}
+            torch.save(state, join(self.model_path,f"{self.model_type}_latest.pth"))
+            trigger += 1
+            score = val_res['AUROC']#0.2*val_res['JS'] + 0.3*val_res['AUPRC']+ 0.5*val_res['DC']        #IOU、SE和F1分别占比为0.2、0.3和0.5
+
+            if score > best['score']:
+                best['score'] = score+0.01
+                best['epoch'] = epoch
+                trigger = 0
+                torch.save(state, join(self.model_path, f"{self.model_type}_best.pth"))
+                print(f"📌 Best model saved at epoch {epoch}, score={best['score']:.4f}")
+
+            if trigger >= self.early_stop:
+                print("=> early stopping")
+                break

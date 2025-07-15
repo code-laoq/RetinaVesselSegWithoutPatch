@@ -7,8 +7,8 @@ import random
 
 def main(config):
     cudnn.benchmark = True
-    if config.model_type not in ['U_Net', 'R2U_Net', 'AttU_Net', 'R2AttU_Net']:
-        print('ERROR!! model_type should be selected in U_Net/R2U_Net/AttU_Net/R2AttU_Net')
+    if config.model_type not in ['U_Net', 'R2U_Net', 'AttU_Net', 'R2AttU_Net','ResU_Net']:
+        print('ERROR!! model_type should be selected in U_Net/R2U_Net/AttU_Net/R2AttU_Net/ResU_Net')
         print('Your input for model_type was %s' % config.model_type)
         return
 
@@ -58,7 +58,7 @@ def main(config):
 
     # Train and sample the images
     if config.mode == 'train':
-        solver.train()
+        solver.train(config)
     elif config.mode == 'test':
         solver.test()
 
@@ -84,10 +84,19 @@ if __name__ == '__main__':
 
     parser.add_argument('--log_step', type=int, default=2)
     parser.add_argument('--val_step', type=int, default=2)
+    parser.add_argument('--early_stop', default=130, type=int,
+                        help='early stopping')
+
+    # 预训练
+    parser.add_argument('--start_epoch', default=1,
+                        help='Start epoch')
+    parser.add_argument('--pre_trained', default=False, type=bool,
+                        help='(path of trained _model)load trained   '
+                             'model to continue train')
 
     # misc
     parser.add_argument('--mode', type=str, default='train')
-    parser.add_argument('--model_type', type=str, default='U_Net', help='U_Net/R2U_Net/AttU_Net/R2AttU_Net')
+    parser.add_argument('--model_type', type=str, default='ResU_Net', help='U_Net/R2U_Net/AttU_Net/R2AttU_Net')
     parser.add_argument('--model_path', type=str, default='./models')
     parser.add_argument('--train_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/DRIVE/train.txt')
     parser.add_argument('--valid_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/DRIVE/test.txt')
