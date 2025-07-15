@@ -1,0 +1,8 @@
+Datasets/ORVS/test/Images/2014.jpg Datasets/ORVS/test/Labels/2014.jpg Datasets/ORVS/fov.png
+Datasets/ORVS/test/Images/2016.jpg Datasets/ORVS/test/Labels/2016.jpg Datasets/ORVS/fov.png
+Datasets/ORVS/test/Images/2045.jpg Datasets/ORVS/test/Labels/2045.jpg Datasets/ORVS/fov.png
+Datasets/ORVS/test/Images/2118.jpg Datasets/ORVS/test/Labels/2118.jpg Datasets/ORVS/fov.png
+Datasets/ORVS/test/Images/2119.jpg Datasets/ORVS/test/Labels/2119.jpg Datasets/ORVS/fov.png
+Datasets/ORVS/test/Images/2120.jpg Datasets/ORVS/test/Labels/2120.jpg Datasets/ORVS/fov.png
+Datasets/ORVS/test/Images/2121.jpg Datasets/ORVS/test/Labels/2121.jpg Datasets/ORVS/fov.png
+Datasets/ORVS/test/Images/2146.jpg Datasets/ORVS/test/Labels/2146.jpg Datasets/ORVS/fov.png

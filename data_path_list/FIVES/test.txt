@@ -1,0 +1,8 @@
+Datasets/FIVES/test/images/1_A.png Datasets/FIVES/test/labels/1_A.png Datasets/FIVES/test/masks/1_A.png
+Datasets/FIVES/test/images/2_A.png Datasets/FIVES/test/labels/2_A.png Datasets/FIVES/test/masks/2_A.png
+Datasets/FIVES/test/images/3_A.png Datasets/FIVES/test/labels/3_A.png Datasets/FIVES/test/masks/3_A.png
+Datasets/FIVES/test/images/4_A.png Datasets/FIVES/test/labels/4_A.png Datasets/FIVES/test/masks/4_A.png
+Datasets/FIVES/test/images/5_A.png Datasets/FIVES/test/labels/5_A.png Datasets/FIVES/test/masks/5_A.png
+Datasets/FIVES/test/images/6_A.png Datasets/FIVES/test/labels/6_A.png Datasets/FIVES/test/masks/6_A.png
+Datasets/FIVES/test/images/7_A.png Datasets/FIVES/test/labels/7_A.png Datasets/FIVES/test/masks/7_A.png
+Datasets/FIVES/test/images/8_A.png Datasets/FIVES/test/labels/8_A.png Datasets/FIVES/test/masks/8_A.png

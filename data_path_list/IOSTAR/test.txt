@@ -1,0 +1,8 @@
+Datasets/IOSTAR/images/37.jpg Datasets/IOSTAR/labels/37_GT.tif Datasets/IOSTAR/masks/37_Mask.tif
+Datasets/IOSTAR/images/38.jpg Datasets/IOSTAR/labels/38_GT.tif Datasets/IOSTAR/masks/38_Mask.tif
+Datasets/IOSTAR/images/39.jpg Datasets/IOSTAR/labels/39_GT.tif Datasets/IOSTAR/masks/39_Mask.tif
+Datasets/IOSTAR/images/40.jpg Datasets/IOSTAR/labels/40_GT.tif Datasets/IOSTAR/masks/40_Mask.tif
+Datasets/IOSTAR/images/43.jpg Datasets/IOSTAR/labels/43_GT.tif Datasets/IOSTAR/masks/43_Mask.tif
+Datasets/IOSTAR/images/44.jpg Datasets/IOSTAR/labels/44_GT.tif Datasets/IOSTAR/masks/44_Mask.tif
+Datasets/IOSTAR/images/45.jpg Datasets/IOSTAR/labels/45_GT.tif Datasets/IOSTAR/masks/45_Mask.tif
+Datasets/IOSTAR/images/48.jpg Datasets/IOSTAR/labels/48_GT.tif Datasets/IOSTAR/masks/48_Mask.tif

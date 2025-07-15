@@ -1,0 +1,130 @@
+# ========================
+# Python 基础排除
+# ========================
+__pycache__/
+*.py[cod]  # 编译的 .pyc, .pyo, .pyd 文件
+*$py.class
+
+# C 扩展和共享库
+*.so
+*.pyd
+*.dll
+
+# ========================
+# 虚拟环境和包管理
+# ========================
+# 虚拟环境目录
+.venv/
+venv/
+ENV/
+env/
+
+# 包构建和分发
+build/
+dist/
+sdist/
+bdist_wheel/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# pip 和 setuptools 相关
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.eggs/
+eggs/
+develop-eggs/
+
+# ========================
+# 数据和模型文件
+# ========================
+# 输入数据和数据集
+data/
+input/
+datasets/
+raw_data/
+processed_data/
+Datasets/
+# 输出和结果
+outputs/
+result/
+saved/
+checkpoints/
+experiments/
+logs/
+*.log
+
+# 预训练和训练好的模型
+pretrained/
+trained_models/
+model_weights/
+
+# ========================
+# 开发工具和 IDE
+# ========================
+# 编辑器配置
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# 缓存和临时文件
+.cache/
+.tmp/
+temp/
+__pycache__/
+# Jupyter Notebook
+.ipynb_checkpoints/
+jupyter_runtime/
+
+# 代码检查和测试
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+nosetests.xml
+pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ========================
+# 框架和库特定
+# ========================
+
+# ========================
+# 环境配置
+# ========================
+# 环境变量
+.env
+.env.*
+!.env.example  # 保留示例文件
+
+# Python 版本
+.python-version
+.pyenv/
+
+# ========================
+# 操作系统文件
+# ========================
+.DS_Store
+Thumbs.db
+__MACOSX/
+
+# ========================
+# 其他
+# ========================
+
+# 打包配置
+*.spec
+*.manifest
+
+# 自动生成的文件
+*.sage.py
+*.pyi  # 类型存根文件
+
+# 临时文件和备份
+*~
+*.bak
+*.swp

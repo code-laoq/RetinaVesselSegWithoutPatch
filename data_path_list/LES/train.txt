@@ -1,0 +1,16 @@
+Datasets/LES/train/images/12.png Datasets/LES/train/labels/12.png Datasets/LES/train/masks/12_mask.gif
+Datasets/LES/train/images/15.png Datasets/LES/train/labels/15.png Datasets/LES/train/masks/15_mask.gif
+Datasets/LES/train/images/33.png Datasets/LES/train/labels/33.png Datasets/LES/train/masks/33_mask.gif
+Datasets/LES/train/images/37.png Datasets/LES/train/labels/37.png Datasets/LES/train/masks/37_mask.gif
+Datasets/LES/train/images/42.png Datasets/LES/train/labels/42.png Datasets/LES/train/masks/42_mask.gif
+Datasets/LES/train/images/49.png Datasets/LES/train/labels/49.png Datasets/LES/train/masks/49_mask.gif
+Datasets/LES/train/images/53.png Datasets/LES/train/labels/53.png Datasets/LES/train/masks/53_mask.gif
+Datasets/LES/train/images/90.png Datasets/LES/train/labels/90.png Datasets/LES/train/masks/90_mask.gif
+Datasets/LES/train/images/111.png Datasets/LES/train/labels/111.png Datasets/LES/train/masks/111_mask.gif
+Datasets/LES/train/images/119.png Datasets/LES/train/labels/119.png Datasets/LES/train/masks/119_mask.gif
+Datasets/LES/train/images/224.png Datasets/LES/train/labels/224.png Datasets/LES/train/masks/224_mask.gif
+Datasets/LES/train/images/240.png Datasets/LES/train/labels/240.png Datasets/LES/train/masks/240_mask.gif
+Datasets/LES/train/images/275.png Datasets/LES/train/labels/275.png Datasets/LES/train/masks/275_mask.gif
+Datasets/LES/train/images/279.png Datasets/LES/train/labels/279.png Datasets/LES/train/masks/279_mask.gif
+Datasets/LES/train/images/304.png Datasets/LES/train/labels/304.png Datasets/LES/train/masks/304_mask.gif
+Datasets/LES/train/images/318.png Datasets/LES/train/labels/318.png Datasets/LES/train/masks/318_mask.gif

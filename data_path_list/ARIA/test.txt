@@ -1,0 +1,5 @@
+/home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Images/508.tif /home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Labels/508.tif /home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Masks/508.png
+/home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Images/551.tif /home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Labels/551.tif /home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Masks/551.png
+/home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Images/555.tif /home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Labels/555.tif /home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Masks/555.png
+/home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Images/558.tif /home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Labels/558.tif /home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Masks/558.png
+/home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Images/561.tif /home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Labels/561.tif /home/dell609/dl_pro/VesselSeg/PANet/Datasets/ARIA/Test/Masks/561.png

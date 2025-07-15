@@ -1,0 +1,5 @@
+Datasets/LES/test/images/367.png Datasets/LES/test/labels/367.png Datasets/LES/test/masks/367_mask.gif
+Datasets/LES/test/images/370.png Datasets/LES/test/labels/370.png Datasets/LES/test/masks/370_mask.gif
+Datasets/LES/test/images/486.png Datasets/LES/test/labels/486.png Datasets/LES/test/masks/486_mask.gif
+Datasets/LES/test/images/529.png Datasets/LES/test/labels/529.png Datasets/LES/test/masks/529_mask.gif
+Datasets/LES/test/images/586.png Datasets/LES/test/labels/586.png Datasets/LES/test/masks/586_mask.gif

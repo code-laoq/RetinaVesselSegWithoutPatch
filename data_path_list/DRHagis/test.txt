@@ -1,0 +1,11 @@
+Datasets/DRHagis/Train/Images/1.jpg Datasets/DRHagis/Train/Labels/1.png Datasets/DRHagis/Train/Masks/1.png
+Datasets/DRHagis/Train/Images/24.jpg Datasets/DRHagis/Train/Labels/24.png Datasets/DRHagis/Train/Masks/24.png
+Datasets/DRHagis/Train/Images/25.jpg Datasets/DRHagis/Train/Labels/25.png Datasets/DRHagis/Train/Masks/25.png
+Datasets/DRHagis/Train/Images/26.jpg Datasets/DRHagis/Train/Labels/26.png Datasets/DRHagis/Train/Masks/26.png
+Datasets/DRHagis/Train/Images/27.jpg Datasets/DRHagis/Train/Labels/27.png Datasets/DRHagis/Train/Masks/27.png
+Datasets/DRHagis/Train/Images/29.jpg Datasets/DRHagis/Train/Labels/29.png Datasets/DRHagis/Train/Masks/29.png
+Datasets/DRHagis/Train/Images/32.jpg Datasets/DRHagis/Train/Labels/32.png Datasets/DRHagis/Train/Masks/32.png
+Datasets/DRHagis/Test/Images/33.jpg Datasets/DRHagis/Test/Labels/33.png Datasets/DRHagis/Test/Masks/33.png
+Datasets/DRHagis/Test/Images/34.jpg Datasets/DRHagis/Test/Labels/34.png Datasets/DRHagis/Test/Masks/34.png
+Datasets/DRHagis/Test/Images/35.jpg Datasets/DRHagis/Test/Labels/35.png Datasets/DRHagis/Test/Masks/35.png
+Datasets/DRHagis/Test/Images/37.jpg Datasets/DRHagis/Test/Labels/37.png Datasets/DRHagis/Test/Masks/37.png

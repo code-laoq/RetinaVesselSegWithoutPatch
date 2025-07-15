@@ -1,0 +1,3 @@
+Datasets/RAVIR/train/images/IR_Case_055.png Datasets/RAVIR/train/labels/IR_Case_055.png Datasets/RAVIR/fov.png
+Datasets/RAVIR/train/images/IR_Case_056.png Datasets/RAVIR/train/labels/IR_Case_056.png Datasets/RAVIR/fov.png
+Datasets/RAVIR/train/images/IR_Case_058.png Datasets/RAVIR/train/labels/IR_Case_058.png Datasets/RAVIR/fov.png
