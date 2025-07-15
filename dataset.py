@@ -22,7 +22,7 @@ class CLAHE:
         return Image.fromarray(eq)
 
 class ImageFolder(data.Dataset):
-    def __init__(self, file_path,delimiter = ' ', image_size=256, mode='train', augmentation_prob=0.4,transform=None):
+    def __init__(self, file_path,delimiter = ' ', height=512,width=512, mode='train', augmentation_prob=0.4,transform=None):
         self.img_list = []
         self.gt_list = []
         self.fov_list = []
@@ -46,13 +46,13 @@ class ImageFolder(data.Dataset):
         except Exception as e:
             raise RuntimeError(f"Error reading file {file_path}: {str(e)}")
 
-        self.image_size = image_size                                # 固定尺寸（如256）Original
+        # self.image_size = image_size                                # 固定尺寸（如256）Original
         self.mode = mode
         self.augmentation_prob = augmentation_prob
 
         if transform is None:
             self.transform = T.Compose([
-            T.Resize((576, 560)),                                   #调整图像尺寸
+            T.Resize((width, height)),                              #调整图像尺寸
             T.Grayscale(num_output_channels=1),                     #灰度化，输出 1 通道 PIL Image
             CLAHE(clipLimit=2.0, tileGridSize=(8, 8)),              #CLAHE 均衡（仍然 PIL Image）
             T.Lambda(lambda img: F.adjust_gamma(img, gamma=1.2)),   #Gamma 校正，使用 torchvision 自带的 functional
@@ -63,21 +63,21 @@ class ImageFolder(data.Dataset):
             self.transform = transform
 
         self.mask_transform=T.Compose([
-            T.Resize((576, 560)),
+            T.Resize((width, height)),
             T.ToTensor(),
         ])
         print(f"image count in {mode} path : {len(self.img_list)}")
 
-
     def __getitem__(self, index):
         # 加载图像和掩码
         image = Image.open(self.img_list[index])
-        mask = Image.open(self.gt_list[index])
+        mask = Image.open(self.gt_list[index]).convert('L')
 
         image= self.transform(image)
         mask = self.mask_transform(mask)
         # print(f"image.shape:{image.shape}")
         # print(f"mask.shape:{mask.shape}")
+
         mask = (mask > 0.5).float()  # 二值化掩码
 
         return image, mask
@@ -132,7 +132,6 @@ def main(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-
 
     # model hyper-parameters
     parser.add_argument('--train_ratio', type=float, default=0.6)
