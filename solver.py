@@ -2,14 +2,11 @@ import os
 import torch
 from torch import optim
 from torch.optim.lr_scheduler import StepLR
-from torchvision.transforms.functional import to_pil_image
 from torchmetrics import Accuracy, JaccardIndex
-from torchmetrics.classification import Specificity, Precision, Recall  # recall==sensitivity
-from torchmetrics.segmentation import DiceScore
+from torchmetrics.classification import Specificity, Precision, Recall,AveragePrecision, AUROC  # recall==sensitivity
 from network import U_Net, R2U_Net, AttU_Net, R2AttU_Net
 from ResUNet import ResUNet
 from PIL import Image
-
 from tools import concat_result
 
 class Solver(object):
@@ -43,9 +40,8 @@ class Solver(object):
         self.metric_sp  = Specificity(task="binary", threshold=0.5).to(self.device)
         self.metric_pc  = Precision(task="binary", threshold=0.5).to(self.device)
         self.metric_js  = JaccardIndex(task="binary", threshold=0.5).to(self.device)
-        # use input_format='index' for class indices format
-        self.metric_dc  = DiceScore(num_classes=2, average='micro', input_format='index').to(self.device)
-
+        self.metric_auprc = AveragePrecision(task="binary").to(self.device)
+        self.metric_auroc = AUROC(task="binary").to(self.device)
         # build
         self.build_model()
         self.scheduler = StepLR(self.optimizer, step_size=self.num_epochs_decay, gamma=0.1)
@@ -74,42 +70,51 @@ class Solver(object):
         running_loss = 0.0
         # reset metrics
         for m in (self.metric_acc, self.metric_se, self.metric_sp,
-                  self.metric_pc, self.metric_js, self.metric_dc):
+                  self.metric_pc, self.metric_js,
+                  self.metric_auprc, self.metric_auroc):
             m.reset()
 
         for images, GT in loader:
             images = images.to(self.device)
             gt_idx = GT.squeeze(1).long().to(self.device)
 
-            logits = self.unet(images)            # [B,2,H,W]
-            loss = self.criterion(logits, gt_idx)
-
-            self.reset_grad()
-            loss.backward()
-            self.optimizer.step()
-
-            running_loss += loss.item() * images.size(0)
-
-            preds = torch.argmax(logits, dim=1)
-
-            # update metrics
+            logits = self.unet(images)              # [B,2,H,W]
+            probs = torch.softmax(logits, dim=1)    # [B,2,H,W]
+            preds = torch.argmax(logits, dim=1)     # [B,H,W]
+            # 更新指标
             self.metric_acc.update(preds, gt_idx)
             self.metric_se .update(preds, gt_idx)
             self.metric_sp .update(preds, gt_idx)
             self.metric_pc .update(preds, gt_idx)
             self.metric_js .update(preds, gt_idx)
-            self.metric_dc .update(preds, gt_idx)
+            # 更新 AUPRC/AUROC（需要把 tensor 展平）
+            self.metric_auprc.update(probs[:, 1].flatten(), gt_idx.flatten())
+            self.metric_auroc.update(probs[:, 1].flatten(), gt_idx.flatten())
 
+            loss = self.criterion(logits, gt_idx)
+            running_loss += loss.item() * images.size(0)
+            self.reset_grad()
+            loss.backward()
+            self.optimizer.step()
+        # 计算指标
         n = len(loader.dataset)
         epoch_loss = running_loss / n
+        #因为Dice系数需要SE和PC，所以单独拎出来计算
+        se = self.metric_se.compute()
+        pc = self.metric_pc.compute()
+        # 手写 DiceScore 计算
+        dice_score = 2 * (se * pc) / (se + pc + 1e-6)
+
         results = {
             'loss': epoch_loss,
             'acc':  self.metric_acc.compute().item(),
-            'SE':   self.metric_se.compute().item(),
             'SP':   self.metric_sp.compute().item(),
-            'PC':   self.metric_pc.compute().item(),
             'JS':   self.metric_js.compute().item(),
-            'DC':   self.metric_dc.compute().item()
+            'AUPRC': self.metric_auprc.compute().item(),
+            'AUROC': self.metric_auroc.compute().item(),
+            'SE':   se.item(),
+            'PC':   pc.item(),
+            'DC':   dice_score.item()
         }
         return results
 
@@ -117,7 +122,8 @@ class Solver(object):
         self.unet.eval()
         running_loss = 0.0
         for m in (self.metric_acc, self.metric_se, self.metric_sp,
-                  self.metric_pc, self.metric_js, self.metric_dc):
+                  self.metric_pc, self.metric_js,
+                  self.metric_auprc, self.metric_auroc):
             m.reset()
 
         with torch.no_grad():
@@ -128,33 +134,46 @@ class Solver(object):
                 gt_idx = GT.squeeze(1).long().to(self.device)
 
                 logits = self.unet(images)
-                loss = self.criterion(logits, gt_idx)
-                running_loss += loss.item() * images.size(0)
-
+                probs = torch.softmax(logits, dim=1)
                 preds = torch.argmax(logits, dim=1)
+
                 self.metric_acc.update(preds, gt_idx)
                 self.metric_se .update(preds, gt_idx)
                 self.metric_sp .update(preds, gt_idx)
                 self.metric_pc .update(preds, gt_idx)
                 self.metric_js .update(preds, gt_idx)
-                self.metric_dc .update(preds, gt_idx)
+                self.metric_auprc.update(probs[:,1].flatten(), gt_idx.flatten())
+                self.metric_auroc.update(probs[:,1].flatten(), gt_idx.flatten())
 
+                loss = self.criterion(logits, gt_idx)
+                running_loss += loss.item() * images.size(0)
                 # 保存预测结果
-                self._save_predictions(images, logits, GT, result_dir, epoch, i)
+                self._save_predictions(images, logits, GT, result_dir, i)
+
+        # 计算指标
         n = len(loader.dataset)
         epoch_loss = running_loss / n
+        #因为Dice系数需要SE和PC，所以单独拎出来计算
+        se = self.metric_se.compute()
+        pc = self.metric_pc.compute()
+        # 手写 DiceScore 计算
+        dice_score = 2 * (se * pc) / (se + pc + 1e-6)
+
         results = {
             'loss': epoch_loss,
-            'acc':  self.metric_acc.compute().item(),
-            'SE':   self.metric_se.compute().item(),
-            'SP':   self.metric_sp.compute().item(),
-            'PC':   self.metric_pc.compute().item(),
-            'JS':   self.metric_js.compute().item(),
-            'DC':   self.metric_dc.compute().item()
+            'acc': self.metric_acc.compute().item(),
+            'SP': self.metric_sp.compute().item(),
+            'JS': self.metric_js.compute().item(),
+            'AUPRC': self.metric_auprc.compute().item(),
+            'AUROC': self.metric_auroc.compute().item(),
+            'SE': se.item(),
+            'PC': pc.item(),
+            'DC': dice_score.item()
         }
         return results
 
-    def _save_predictions(self, images, logits, GT, result_dir, epoch, batch_idx):
+    @staticmethod
+    def _save_predictions(images, logits, GT, result_dir, batch_idx):
         # 恢复为多类概率
         probs = torch.softmax(logits, dim=1)
         for idx in range(images.size(0)):
@@ -190,9 +209,9 @@ class Solver(object):
             val_res   = self.validate_epoch(self.valid_loader, epoch)
 
             print(f"epoch:{epoch} [Train] Loss: {train_res['loss']:.4f}  SE: {train_res['SE']:.4f}  SP: {train_res['SP']:.4f}  ACC: {train_res['acc']:.4f}  "
-                  f"F1: {train_res['DC']:.4f}  PC: {train_res['PC']:.4f}  IOU: {train_res['JS']:.4f}")
+                  f"F1: {train_res['DC']:.4f}  PC: {train_res['PC']:.4f}  IOU: {train_res['JS']:.4f}  AUPRC={train_res['AUPRC']:.4f}  AUROC={train_res['AUROC']:.4f}")
             print(f"[Valid] Loss: {val_res['loss']:.4f}  SE: {val_res['SE']:.4f}  SP: {val_res['SP']:.4f}  ACC: {val_res['acc']:.4f}  "
-                f"F1: {val_res['DC']:.4f}  PC: {val_res['PC']:.4f}  IOU: {val_res['JS']:.4f}")
+                f"F1: {val_res['DC']:.4f}  PC: {val_res['PC']:.4f}  IOU: {val_res['JS']:.4f}  AUPRC={val_res['AUPRC']:.4f}  AUROC={val_res['AUROC']:.4f}")
 
             score = val_res['JS'] + val_res['DC']
             if score > best_score:
