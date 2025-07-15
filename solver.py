@@ -9,13 +9,8 @@ from torchmetrics.segmentation import DiceScore
 from network import U_Net, R2U_Net, AttU_Net, R2AttU_Net
 from ResUNet import ResUNet
 from PIL import Image
-# 反标准化函数
 
-def inverse_normalize(tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]):
-    for t, m, s in zip(tensor, mean, std):
-        t.mul_(s).add_(m)
-    tensor = tensor.clamp(min=0.0, max=1.0)
-    return (tensor * 255).type(torch.uint8)
+from tools import concat_result
 
 class Solver(object):
     def __init__(self, config, train_loader, valid_loader, test_loader):
@@ -43,11 +38,11 @@ class Solver(object):
         self.criterion = torch.nn.CrossEntropyLoss()
 
         # Metrics for multiclass (2 classes: background vs vessel)
-        self.metric_acc = Accuracy(task="multiclass", num_classes=2).to(self.device)
-        self.metric_se  = Recall(task="multiclass", num_classes=2, average='macro').to(self.device)
-        self.metric_sp  = Specificity(task="multiclass", num_classes=2, average='macro').to(self.device)
-        self.metric_pc  = Precision(task="multiclass", num_classes=2, average='macro').to(self.device)
-        self.metric_js  = JaccardIndex(task="multiclass", num_classes=2).to(self.device)
+        self.metric_acc = Accuracy(task="binary", threshold=0.5).to(self.device)
+        self.metric_se  = Recall(task="binary", threshold=0.5).to(self.device)
+        self.metric_sp  = Specificity(task="binary", threshold=0.5).to(self.device)
+        self.metric_pc  = Precision(task="binary", threshold=0.5).to(self.device)
+        self.metric_js  = JaccardIndex(task="binary", threshold=0.5).to(self.device)
         # use input_format='index' for class indices format
         self.metric_dc  = DiceScore(num_classes=2, average='micro', input_format='index').to(self.device)
 
@@ -160,24 +155,33 @@ class Solver(object):
         return results
 
     def _save_predictions(self, images, logits, GT, result_dir, epoch, batch_idx):
-        # restore to multiclass probability
+        # 恢复为多类概率
         probs = torch.softmax(logits, dim=1)
         for idx in range(images.size(0)):
-            # save original image
-            image_tensor = images[idx].cpu().detach()
-            image_pil = to_pil_image(image_tensor)
-            image_pil.save(os.path.join(result_dir, f'batch_{batch_idx}_img_{idx}_image.png'))
+            # 获取原始图像
+            ori_img = images[idx].cpu().detach().numpy().transpose(1, 2, 0)
+            # 如果 ori_img 是 [0,1] 范围，转换为 [0,255]
+            if ori_img.max() <= 1:
+                ori_img = ori_img * 255
 
-            # save vessel probability map (class=1 channel)
-            vessel_prob = probs[idx,1]
-            arr = (vessel_prob * 255).type(torch.uint8).cpu().numpy()
-            vessel_pil = Image.fromarray(arr, mode='L')
-            vessel_pil.save(os.path.join(result_dir, f'batch_{batch_idx}_img_{idx}_vessel.png'))
+            # 获取预测结果（血管概率）
+            pred_res = probs[idx, 1].cpu().detach().numpy()  # (H, W)
 
-            # save gt mask
-            gt_arr = (GT[idx].squeeze(0) * 255).type(torch.uint8).cpu().numpy()
-            gt_pil = Image.fromarray(gt_arr, mode='L')
-            gt_pil.save(os.path.join(result_dir, f'batch_{batch_idx}_img_{idx}_gt.png'))
+            # 获取真实标签
+            gt = GT[idx].squeeze(0).cpu().detach().numpy()  # (H, W)
+
+            # 拼接图像
+            total_img = concat_result(ori_img, pred_res, gt)
+            if total_img.ndim == 3 and total_img.shape[2] == 1:
+                # 单通道图像，移除通道维度并指定模式为 'L'
+                total_img = total_img.squeeze(2)  # 形状从 (H, 4*W, 1) 变为 (H, 4*W)
+                total_pil = Image.fromarray(total_img, mode='L')
+            else:
+                # 多通道图像（例如 RGB），直接转换
+                total_pil = Image.fromarray(total_img)  # 默认模式为 'RGB'
+
+            # 保存拼接图像
+            total_pil.save(os.path.join(result_dir, f'batch_{batch_idx}_img_{idx}_concat.png'))
 
     def train(self):
         best_score = 0.0
