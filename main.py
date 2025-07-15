@@ -29,7 +29,7 @@ def main(config):
 
     config.augmentation_prob = augmentation_prob
     config.num_epochs = 100
-    config.batch_size = 2
+    config.batch_size = 4
     config.lr = lr
     config.num_epochs_decay = decay_epoch
 
@@ -61,7 +61,6 @@ def main(config):
         solver.train(config)
     elif config.mode == 'test':
         solver.test()
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -96,7 +95,7 @@ if __name__ == '__main__':
 
     # misc
     parser.add_argument('--mode', type=str, default='train')
-    parser.add_argument('--model_type', type=str, default='ResU_Net', help='U_Net/R2U_Net/AttU_Net/R2AttU_Net')
+    parser.add_argument('--model_type', type=str, default='U_Net', help='U_Net/R2U_Net/AttU_Net/R2AttU_Net')
     parser.add_argument('--model_path', type=str, default='./models')
     parser.add_argument('--train_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/DRIVE/train.txt')
     parser.add_argument('--valid_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/DRIVE/test.txt')

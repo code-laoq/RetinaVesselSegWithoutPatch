@@ -47,6 +47,7 @@ class Solver(object):
         self.metric_auroc = AUROC(task="binary").to(self.device)
         # build
         self.build_model()
+        self.optimizer = optim.Adam(self.unet.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
         self.scheduler = StepLR(self.optimizer, step_size=self.num_epochs_decay, gamma=0.1)
 
     def build_model(self):
@@ -63,103 +64,67 @@ class Solver(object):
             model = R2AttU_Net(img_ch=1, output_ch=2, t=self.t)
         model.to(self.device)
         self.unet = model
-        self.optimizer = optim.Adam(self.unet.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
 
     def reset_grad(self):
         self.optimizer.zero_grad()
 
-    def train_epoch(self, loader):
-        self.unet.train()
+    def _run_epoch(self, loader, is_train=True, epoch=None):
+        # 设置模型模式
+        if is_train:
+            self.unet.train()
+        else:
+            self.unet.eval()
+
         running_loss = 0.0
-        # reset metrics
+        # 重置指标
         for m in (self.metric_acc, self.metric_se, self.metric_sp,
-                  self.metric_pc, self.metric_js,
-                  self.metric_auprc, self.metric_auroc):
+        self.metric_pc, self.metric_js,
+        self.metric_auprc, self.metric_auroc):
             m.reset()
 
-        for images, GT in loader:
+        # 如果是验证模式，创建结果保存目录
+        if not is_train:
+            result_dir = join(self.result_path, f'epoch_{epoch + 1}')
+            os.makedirs(result_dir, exist_ok=True)
+
+        # 遍历数据加载器
+        for i, (images, GT) in enumerate(loader):
             images = images.to(self.device)
             gt_idx = GT.squeeze(1).long().to(self.device)
 
-            logits = self.unet(images)              # [B,2,H,W]
-            probs = torch.softmax(logits, dim=1)    # [B,2,H,W]
-            preds = torch.argmax(logits, dim=1)     # [B,H,W]
-            # 更新指标
-            self.metric_acc.update(preds, gt_idx)
-            self.metric_se .update(preds, gt_idx)
-            self.metric_sp .update(preds, gt_idx)
-            self.metric_pc .update(preds, gt_idx)
-            self.metric_js .update(preds, gt_idx)
-            # 更新 AUPRC/AUROC（需要把 tensor 展平）
-            self.metric_auprc.update(probs[:, 1].flatten(), gt_idx.flatten())
-            self.metric_auroc.update(probs[:, 1].flatten(), gt_idx.flatten())
+            # 控制是否计算梯度
+            with torch.set_grad_enabled(is_train):
+                logits = self.unet(images)  # [B,2,H,W]
+                probs = torch.softmax(logits, dim=1)  # [B,2,H,W]
+                preds = torch.argmax(logits, dim=1)  # [B,H,W]
 
-            loss = self.criterion(logits, gt_idx)
-            running_loss += loss.item() * images.size(0)
-            self.reset_grad()
-            loss.backward()
-            self.optimizer.step()
-        # 计算指标
-        n = len(loader.dataset)
-        epoch_loss = running_loss / n
-        #因为Dice系数需要SE和PC，所以单独拎出来计算
-        se = self.metric_se.compute()
-        pc = self.metric_pc.compute()
-        # 手写 DiceScore 计算
-        dice_score = 2 * (se * pc) / (se + pc + 1e-6)
-
-        results = {
-            'loss': epoch_loss,
-            'acc':  self.metric_acc.compute().item(),
-            'SP':   self.metric_sp.compute().item(),
-            'JS':   self.metric_js.compute().item(),
-            'AUPRC': self.metric_auprc.compute().item(),
-            'AUROC': self.metric_auroc.compute().item(),
-            'SE':   se.item(),
-            'PC':   pc.item(),
-            'DC':   dice_score.item()
-        }
-        return results
-
-    def validate_epoch(self, loader, epoch):
-        self.unet.eval()
-        running_loss = 0.0
-        for m in (self.metric_acc, self.metric_se, self.metric_sp,
-                  self.metric_pc, self.metric_js,
-                  self.metric_auprc, self.metric_auroc):
-            m.reset()
-
-        with torch.no_grad():
-            result_dir = join(self.result_path, f'epoch_{epoch + 1}')
-            os.makedirs(result_dir, exist_ok=True)
-            for i, (images, GT) in enumerate(loader):
-                images = images.to(self.device)
-                gt_idx = GT.squeeze(1).long().to(self.device)
-
-                logits = self.unet(images)
-                probs = torch.softmax(logits, dim=1)
-                preds = torch.argmax(logits, dim=1)
-
+                # 更新指标
                 self.metric_acc.update(preds, gt_idx)
-                self.metric_se .update(preds, gt_idx)
-                self.metric_sp .update(preds, gt_idx)
-                self.metric_pc .update(preds, gt_idx)
-                self.metric_js .update(preds, gt_idx)
-                self.metric_auprc.update(probs[:,1].flatten(), gt_idx.flatten())
-                self.metric_auroc.update(probs[:,1].flatten(), gt_idx.flatten())
+                self.metric_se.update(preds, gt_idx)
+                self.metric_sp.update(preds, gt_idx)
+                self.metric_pc.update(preds, gt_idx)
+                self.metric_js.update(preds, gt_idx)
+                self.metric_auprc.update(probs[:, 1].flatten(), gt_idx.flatten())
+                self.metric_auroc.update(probs[:, 1].flatten(), gt_idx.flatten())
 
+                # 计算损失
                 loss = self.criterion(logits, gt_idx)
                 running_loss += loss.item() * images.size(0)
-                # 保存预测结果
-                self._save_predictions(images, logits, GT, result_dir, i)
+
+                # 训练模式下执行反向传播和优化
+                if is_train:
+                    self.reset_grad()
+                    loss.backward()
+                    self.optimizer.step()
+                # 验证模式下保存预测结果
+                else:
+                    self._save_predictions(images, logits, GT, result_dir, i)
 
         # 计算指标
         n = len(loader.dataset)
         epoch_loss = running_loss / n
-        #因为Dice系数需要SE和PC，所以单独拎出来计算
         se = self.metric_se.compute()
         pc = self.metric_pc.compute()
-        # 手写 DiceScore 计算
         dice_score = 2 * (se * pc) / (se + pc + 1e-6)
 
         results = {
@@ -174,6 +139,14 @@ class Solver(object):
             'DC': dice_score.item()
         }
         return results
+
+    def train_epoch(self, loader):
+        """训练一个 epoch"""
+        return self._run_epoch(loader, is_train=True)
+
+    def validate_epoch(self, loader, epoch):
+        """验证一个 epoch"""
+        return self._run_epoch(loader, is_train=False, epoch=epoch)
 
     @staticmethod
     def _save_predictions(images, logits, GT, result_dir, batch_idx):
@@ -211,12 +184,10 @@ class Solver(object):
             # Load checkpoint.   checkpoint相当于保存模型的参数，优化器参数，loss，epoch的文件夹
             print('==> Resuming from checkpoint..')
             checkpoint = torch.load(join(self.model_path,f"{self.model_type}_latest.pth"),
-                map_location=args.device)  #torch.load(args.outf + '%s/ResUNet_latest_model.pth' % args.pre_trained)
+                map_location=args.device)
             self.unet.load_state_dict(checkpoint['net'])
-            #net = net.to(device)
             self.optimizer.load_state_dict(checkpoint['optimizer'])
             args.start_epoch = checkpoint['epoch'] + 1
-
 
         best = {'epoch': 0, 'score': 0.5}
         trigger = 0                                             #初始化早停累加器
@@ -235,15 +206,105 @@ class Solver(object):
             state = {'net': self.unet.state_dict(), 'optimizer': self.optimizer.state_dict(), 'epoch': epoch}
             torch.save(state, join(self.model_path,f"{self.model_type}_latest.pth"))
             trigger += 1
-            score = val_res['AUROC']#0.2*val_res['JS'] + 0.3*val_res['AUPRC']+ 0.5*val_res['DC']        #IOU、SE和F1分别占比为0.2、0.3和0.5
+            # score = val_res['AUPRC']#0.2*val_res['JS'] + 0.3*val_res['AUPRC']+ 0.5*val_res['DC']        #IOU、SE和F1分别占比为0.2、0.3和0.5
+            #
+            # if score > best['score']:
+            #     best['score'] = score
+            #     best['epoch'] = epoch
+            #     trigger = 0
+            #     torch.save(state, join(self.model_path, f"{self.model_type}_best.pth"))
+            #     print(f"📌 Best model saved at epoch {epoch}, score={best['score']:.4f}")
+            #
+            # if trigger >= self.early_stop:
+            #     print("=> early stopping")
+            #     break
 
-            if score > best['score']:
-                best['score'] = score+0.01
-                best['epoch'] = epoch
-                trigger = 0
-                torch.save(state, join(self.model_path, f"{self.model_type}_best.pth"))
-                print(f"📌 Best model saved at epoch {epoch}, score={best['score']:.4f}")
+        torch.save(state, join(self.model_path, f"{self.model_type}_best.pth"))
+    def test(self):
+        """
+        测试接口：在 test_loader 上评估已保存的最佳模型，并保存预测图与指标。
+        args.device 应与训练时保持一致，例如 'cuda:0' 或 'cpu'。
+        """
+        # 1. 加载最优模型参数
+        best_path = join(self.model_path, f"{self.model_type}_best.pth")
+        assert os.path.exists(best_path), f"找不到最佳模型文件: {best_path}"
+        print(f"==> Loading best model from {best_path}")
+        checkpoint = torch.load(best_path, map_location=self.device)
+        # 如果保存时只保存了 state_dict，直接 load_state_dict(...)
+        # 如果像训练时保存了 {'net':state_dict,...}
+        if isinstance(checkpoint, dict) and 'net' in checkpoint:
+            self.unet.load_state_dict(checkpoint['net'])
+        else:
+            self.unet.load_state_dict(checkpoint)
+        self.unet.to(self.device)
+        self.unet.eval()
 
-            if trigger >= self.early_stop:
-                print("=> early stopping")
-                break
+        # 2. 重置所有指标
+        for m in (self.metric_acc, self.metric_se, self.metric_sp,
+                  self.metric_pc, self.metric_js,
+                  self.metric_auprc, self.metric_auroc):
+            m.reset()
+
+        # 3. 创建测试结果保存目录
+        test_dir = join(self.result_path, "test")
+        os.makedirs(test_dir, exist_ok=True)
+
+        # 4. 遍历 test_loader，不计算梯度，保存每个 batch 的预测图
+        total_loss = 0.0
+        with torch.no_grad():
+            for i, (images, GT) in enumerate(self.test_loader):
+                images = images.to(self.device)
+                gt_idx = GT.squeeze(1).long().to(self.device)
+
+                logits = self.unet(images)               # [B,2,H,W]
+                probs  = torch.softmax(logits, dim=1)    # [B,2,H,W]
+                preds  = torch.argmax(logits, dim=1)     # [B,H,W]
+
+                # 更新指标
+                self.metric_acc.update(preds, gt_idx)
+                self.metric_se .update(preds, gt_idx)
+                self.metric_sp .update(preds, gt_idx)
+                self.metric_pc .update(preds, gt_idx)
+                self.metric_js .update(preds, gt_idx)
+                self.metric_auprc.update(probs[:,1].flatten(), gt_idx.flatten())
+                self.metric_auroc.update(probs[:,1].flatten(), gt_idx.flatten())
+
+                # 累计损失
+                loss = self.criterion(logits, gt_idx)
+                total_loss += loss.item() * images.size(0)
+
+                # 保存该 batch 的预测可视化
+                self._save_predictions(images, logits, GT, test_dir, i)
+
+        # 5. 计算并打印测试集整体指标
+        n = len(self.test_loader.dataset)
+        avg_loss = total_loss / n
+        se  = self.metric_se.compute()
+        pc  = self.metric_pc.compute()
+        dice= 2 * (se * pc) / (se + pc + 1e-6)
+
+        results = {
+            'loss':  avg_loss,
+            'acc':   self.metric_acc.compute().item(),
+            'SE':    se.item(),
+            'SP':    self.metric_sp.compute().item(),
+            'PC':    pc.item(),
+            'JS':    self.metric_js.compute().item(),
+            'DC':    dice.item(),
+            'AUPRC': self.metric_auprc.compute().item(),
+            'AUROC': self.metric_auroc.compute().item(),
+        }
+
+        print("===== Test Results =====")
+        print(f"Loss:  {results['loss']:.4f}")
+        print(f"ACC:   {results['acc']:.4f}")
+        print(f"SE:    {results['SE']:.4f}")
+        print(f"SP:    {results['SP']:.4f}")
+        print(f"PC:    {results['PC']:.4f}")
+        print(f"JS:    {results['JS']:.4f}")
+        print(f"DC(F1):{results['DC']:.4f}")
+        print(f"AUPRC: {results['AUPRC']:.4f}")
+        print(f"AUROC: {results['AUROC']:.4f}")
+
+        # 返回结果字典，供外部脚本进一步使用
+        return results
