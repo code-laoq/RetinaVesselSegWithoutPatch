@@ -3,6 +3,7 @@ import os
 import random
 import shutil
 import numpy as np
+import torch
 from PIL import Image
 from torch.utils import data
 import cv2
@@ -23,6 +24,11 @@ class CLAHE:
 
 class ImageFolder(data.Dataset):
     def __init__(self, file_path,delimiter = ' ', height=512,width=512, mode='train', augmentation_prob=0.4,transform=None):
+        self.height = height
+        self.width = width
+        self.mode = mode
+        self.aug_p = augmentation_prob
+
         self.img_list = []
         self.gt_list = []
         self.fov_list = []
@@ -46,13 +52,9 @@ class ImageFolder(data.Dataset):
         except Exception as e:
             raise RuntimeError(f"Error reading file {file_path}: {str(e)}")
 
-        # self.image_size = image_size                                # 固定尺寸（如256）Original
-        self.mode = mode
-        self.augmentation_prob = augmentation_prob
-
         if transform is None:
             self.transform = T.Compose([
-            T.Resize((width, height)),                              #调整图像尺寸
+            T.Resize((width, height)),                            #调整图像尺寸
             T.Grayscale(num_output_channels=1),                     #灰度化，输出 1 通道 PIL Image
             CLAHE(clipLimit=2.0, tileGridSize=(8, 8)),              #CLAHE 均衡（仍然 PIL Image）
             T.Lambda(lambda img: F.adjust_gamma(img, gamma=1.2)),   #Gamma 校正，使用 torchvision 自带的 functional
@@ -66,24 +68,12 @@ class ImageFolder(data.Dataset):
             T.Resize((width, height)),
             T.ToTensor(),
         ])
-        print(f"image count in {mode} path : {len(self.img_list)}")
+        print(f"image count in {mode} path : {len(self.img_list)} from {file_path}")
 
     def __getitem__(self, index):
         # 加载图像和掩码
-        # 加载npy文件
-        image = np.load(self.img_list[index], mmap_mode="r")
-        mask = np.load(self.gt_list[index], mmap_mode="r")
-        fov = np.load(self.fov_list[index])
-
-        # 将 NumPy 数组转换为 PIL 图像
-        # 假设 image 是 uint8 类型的 (H, W, C) 或 (H, W) 数组
-        if image.dtype != np.uint8:
-            image = (image * 255).astype(np.uint8)  # 如果是 float32，转换为 uint8
-        image = Image.fromarray(image)
-        # # 假设 mask 是 uint8 类型的 (H, W) 数组
-        mask = Image.fromarray(mask)
-        # 如果需要处理 FOV
-        fov = Image.fromarray(fov)
+        image = Image.open(self.img_list[index])
+        mask = Image.open(self.gt_list[index])#.convert('L')  #如果掩码是三通道的，使用灰度模式打开图像
 
         image= self.transform(image)
         mask = self.mask_transform(mask)
@@ -92,3 +82,6 @@ class ImageFolder(data.Dataset):
         mask = (mask > 0.5).float()  # 二值化掩码
 
         return image, mask
+
+    def __len__(self):
+        return len(self.img_list)

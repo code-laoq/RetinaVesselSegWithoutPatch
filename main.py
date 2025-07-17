@@ -100,9 +100,9 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default='train')
     parser.add_argument('--model_type', type=str, default='U_Net', help='U_Net/R2U_Net/AttU_Net/R2AttU_Net')
     parser.add_argument('--model_path', type=str, default='./checkpoints')
-    parser.add_argument('--train_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/ARIA/train_n.txt')
-    parser.add_argument('--valid_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/ARIA/test_n.txt')
-    parser.add_argument('--test_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/ARIA/val_n.txt')
+    parser.add_argument('--train_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/ARIA/train.txt')
+    parser.add_argument('--valid_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/ARIA/test.txt')
+    parser.add_argument('--test_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/ARIA/val.txt')
     parser.add_argument('--result_path', type=str, default='./result/')
 
     parser.add_argument('--cuda_idx', type=int, default=1)
