@@ -4,6 +4,7 @@ from solver import Solver
 from data_loader import get_loader
 from torch.backends import cudnn
 import random
+from datetime import datetime
 
 def main(config):
     cudnn.benchmark = True
@@ -28,32 +29,34 @@ def main(config):
     decay_epoch = int(epoch * decay_ratio)
 
     config.augmentation_prob = augmentation_prob
-    config.num_epochs = 100
-    config.batch_size = 1
+    config.num_epochs = 10
+    config.batch_size = 2
     config.lr = lr
     config.num_epochs_decay = decay_epoch
-
-    #print(config)
-
+    height = 512
+    width = 512
+    # print(config)
     train_loader = get_loader(file_path=config.train_file_path,
-        image_size=config.image_size,
+        height=height,
+        width=width,
         batch_size=config.batch_size,
         num_workers=config.num_workers,
         mode='train',
         augmentation_prob=config.augmentation_prob)
     valid_loader = get_loader(file_path=config.valid_file_path,
-        image_size=config.image_size,
+        height=height,
+        width=width,
         batch_size=config.batch_size,
         num_workers=config.num_workers,
         mode='valid',
         augmentation_prob=0.)
     test_loader = get_loader(file_path=config.test_file_path,
-        image_size=config.image_size,
+        height=height,
+        width=width,
         batch_size=config.batch_size,
         num_workers=config.num_workers,
         mode='test',
         augmentation_prob=0.)
-
     solver = Solver(config, train_loader, valid_loader, test_loader)
 
     # Train and sample the images
@@ -69,7 +72,7 @@ if __name__ == '__main__':
     parser.add_argument('--image_size', type=int, default=512)
     parser.add_argument('--t', type=int, default=3, help='t for Recurrent step of R2U_Net or R2AttU_Net')
 
-    # training hyper-parameters
+    # training hyper parameters
     parser.add_argument('--img_ch', type=int, default=3)
     parser.add_argument('--output_ch', type=int, default=2)
     parser.add_argument('--num_epochs', type=int, default=100)
@@ -97,9 +100,9 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default='train')
     parser.add_argument('--model_type', type=str, default='U_Net', help='U_Net/R2U_Net/AttU_Net/R2AttU_Net')
     parser.add_argument('--model_path', type=str, default='./checkpoints')
-    parser.add_argument('--train_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/FIVES/train.txt')
-    parser.add_argument('--valid_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/FIVES/test.txt')
-    parser.add_argument('--test_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/FIVES/val.txt')
+    parser.add_argument('--train_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/ARIA/train_n.txt')
+    parser.add_argument('--valid_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/ARIA/test_n.txt')
+    parser.add_argument('--test_file_path', type=str, default='/home/dell609/dl_pro/VesselSeg/UNet+/data_path_list/ARIA/val_n.txt')
     parser.add_argument('--result_path', type=str, default='./result/')
 
     parser.add_argument('--cuda_idx', type=int, default=1)
