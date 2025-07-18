@@ -4,10 +4,9 @@ from os.path import join
 import torch
 from torch import optim
 from torch.optim.lr_scheduler import StepLR
-from torch.cuda.amp import GradScaler, autocast
 from torchmetrics import Accuracy, JaccardIndex
 from torchmetrics.classification import Specificity, Precision, Recall,AveragePrecision, AUROC  # recall==sensitivity
-from logs.logger import Print_Logger
+from tool.logger import Print_Logger
 from models.UNetFamily import UNet,ResUNet
 from PIL import Image
 from tools import concat_result
@@ -19,9 +18,6 @@ class Solver(object):
         self.unet = None
         self.optimizer = None
         self.device = config.device
-        # AMP
-        self.scaler = GradScaler()
-        self.autocast = autocast
         # loaders
         self.train_loader = train_loader
         self.valid_loader = valid_loader
@@ -87,22 +83,18 @@ class Solver(object):
             result_dir = join(self.result_path, f'epoch_{epoch + 1}')
             os.makedirs(result_dir, exist_ok=True)
 
-        # 梯度累积步数（可根据显存和需求调整）
-        accumulation_steps = 4  # 例如累积4个批次
-
+        # 遍历数据加载器
         for i, (images, GT) in enumerate(loader):
             images = images.to(self.device)
             gt_idx = GT.squeeze(1).long().to(self.device)
 
-            if is_train:
-                with self.autocast():
-                    logits = self.unet(images)
-                    loss = self.criterion(logits, gt_idx)
-                running_loss += loss.item() * images.size(0)
+            # 控制是否计算梯度
+            with torch.set_grad_enabled(is_train):
+                logits = self.unet(images)  # [B,2,H,W]
+                probs = torch.softmax(logits, dim=1)  # [B,2,H,W]
+                preds = torch.argmax(logits, dim=1)  # [B,H,W]
 
-                # 更新指标用 fp32 预测
-                probs = torch.softmax(logits, dim=1)
-                preds = torch.argmax(logits, dim=1)
+                # 更新指标
                 self.metric_acc.update(preds, gt_idx)
                 self.metric_se.update(preds, gt_idx)
                 self.metric_sp.update(preds, gt_idx)
@@ -111,30 +103,16 @@ class Solver(object):
                 self.metric_auprc.update(probs[:, 1].flatten(), gt_idx.flatten())
                 self.metric_auroc.update(probs[:, 1].flatten(), gt_idx.flatten())
 
-                # 缩放损失并反向传播，累积梯度
-                self.scaler.scale(loss).backward()
-
-                # 在累积步数达到时更新参数并重置梯度
-                if (i + 1) % accumulation_steps == 0 or (i + 1) == len(loader):
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
-                    self.reset_grad()
-            else:
-                # 验证模式下只需前向传播
-                logits = self.unet(images)
-                probs = torch.softmax(logits, dim=1)
-                preds = torch.argmax(logits, dim=1)
-                self.metric_acc.update(preds, gt_idx)
-                self.metric_se.update(preds, gt_idx)
-                self.metric_sp.update(preds, gt_idx)
-                self.metric_pc.update(preds, gt_idx)
-                self.metric_js.update(preds, gt_idx)
-                self.metric_auprc.update(probs[:, 1].flatten(), gt_idx.flatten())
-                self.metric_auroc.update(probs[:, 1].flatten(), gt_idx.flatten())
-
+                # 计算损失
                 loss = self.criterion(logits, gt_idx)
                 running_loss += loss.item() * images.size(0)
-                self._save_predictions(images, logits, GT, result_dir, i)
+
+                if is_train:  # 训练模式下执行反向传播和优化
+                    self.reset_grad()
+                    loss.backward()
+                    self.optimizer.step()
+                else:  # 验证模式下保存预测结果
+                    self._save_predictions(images, logits, GT, result_dir, i)
 
         # 计算指标
         n = len(loader.dataset)
@@ -198,7 +176,7 @@ class Solver(object):
         # 获取当前日期并生成文件名
         today = datetime.now().strftime("%m%d")
         log_path = './logs'  #日志路径
-        log_filename = f"{self.model_type}_{today}r.log"
+        log_filename = f"{self.model_type}_{today}.log"
         sys.stdout = Print_Logger(os.path.join(log_path, log_filename))
         print("The computing device used is:" + self.device)
 

@@ -1,5 +1,11 @@
 import numpy as np
 
+# 浮点数值四舍五入到指定的小数位数
+def dict_round(dic,num):
+    for key,value in dic.items():
+        dic[key] = round(value,num)
+    return dic
+
 def concat_result(ori_img, pred_res, gt):
     """将原始图像、预测结果、二值化图像和真实标签拼接成一张结果图"""
     # 确保输入是 (H, W, C) 格式
