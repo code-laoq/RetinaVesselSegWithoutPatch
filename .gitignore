@@ -53,6 +53,7 @@ result/
 saved/
 checkpoints/
 experiments/
+log/
 logs/
 *.log
 
