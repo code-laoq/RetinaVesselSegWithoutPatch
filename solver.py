@@ -1,12 +1,14 @@
-import os
+import os,sys,time
+from datetime import datetime
 from os.path import join
 import torch
 from torch import optim
 from torch.optim.lr_scheduler import StepLR
+from torch.cuda.amp import GradScaler, autocast
 from torchmetrics import Accuracy, JaccardIndex
 from torchmetrics.classification import Specificity, Precision, Recall,AveragePrecision, AUROC  # recall==sensitivity
-from network import U_Net, R2U_Net, AttU_Net, R2AttU_Net
-from ResUNet import ResUNet
+from logger import Print_Logger
+from models.UNetFamily import UNet,ResUNet
 from PIL import Image
 from tools import concat_result
 
@@ -16,8 +18,10 @@ class Solver(object):
         self.early_stop = config.early_stop
         self.unet = None
         self.optimizer = None
-        self.device = torch.device('cuda:0')
-
+        self.device = config.device#torch.device('cuda:0')
+        # AMP
+        self.scaler = GradScaler()
+        self.autocast = autocast
         # loaders
         self.train_loader = train_loader
         self.valid_loader = valid_loader
@@ -52,18 +56,14 @@ class Solver(object):
 
     def build_model(self):
         # output_ch=2 for background and vessel
-        if self.model_type == 'U_Net':
-            model = U_Net(1,2)
-        elif self.model_type == 'R2U_Net':
-            model = R2U_Net(img_ch=1, output_ch=2, t=self.t)
-        elif self.model_type == 'AttU_Net':
-            model = AttU_Net(img_ch=1, output_ch=2)
-        elif self.model_type == 'ResU_Net':
-            model =ResUNet(1,2)
+        if self.model_type == 'UNet':
+            model = UNet(1,2)
         else:
-            model = R2AttU_Net(img_ch=1, output_ch=2, t=self.t)
+            model =ResUNet(1,2)
+
         model.to(self.device)
         self.unet = model
+        print(f"train {self.model_type}")
 
     def reset_grad(self):
         self.optimizer.zero_grad()
@@ -111,13 +111,11 @@ class Solver(object):
                 loss = self.criterion(logits, gt_idx)
                 running_loss += loss.item() * images.size(0)
 
-                # 训练模式下执行反向传播和优化
-                if is_train:
+                if is_train:                                # 训练模式下执行反向传播和优化
                     self.reset_grad()
                     loss.backward()
                     self.optimizer.step()
-                # 验证模式下保存预测结果
-                else:
+                else:                                       # 验证模式下保存预测结果
                     self._save_predictions(images, logits, GT, result_dir, i)
 
         # 计算指标
@@ -179,6 +177,13 @@ class Solver(object):
             total_pil.save(join(result_dir, f'batch_{batch_idx}_img_{idx}_concat.png'))
 
     def train(self,args):
+        # 获取当前日期并生成文件名
+        today = datetime.now().strftime("%m%d")
+        log_path = './logs'  #日志路径
+        log_filename = f"{self.model_type}_{today}r.log"
+        sys.stdout = Print_Logger(os.path.join(log_path, log_filename))
+        print("The computing device used is:" + self.device)
+
         #如果保存了模型权重，则进行预训练
         if args.pre_trained:
             # Load checkpoint.   checkpoint相当于保存模型的参数，优化器参数，loss，epoch的文件夹
@@ -197,36 +202,41 @@ class Solver(object):
 
             self.scheduler.step()
 
-            print(f"epoch:{epoch} [Train] Loss: {train_res['loss']:.4f}  SE: {train_res['SE']:.4f}  SP: {train_res['SP']:.4f}  ACC: {train_res['acc']:.4f}  "
+            #打印当前epoch、学习率和时间
+            print('\nEPOCH: %d/%d --(learn_rate:%.6f) | Time: %s' % \
+                  (epoch, self.num_epochs, self.optimizer.state_dict()['param_groups'][0]['lr'],time.asctime()))
+
+            print(f"[Train] Loss: {train_res['loss']:.4f}  SE: {train_res['SE']:.4f}  SP: {train_res['SP']:.4f}  ACC: {train_res['acc']:.4f}  "
                   f"F1: {train_res['DC']:.4f}  PC: {train_res['PC']:.4f}  IOU: {train_res['JS']:.4f}  PR: {train_res['AUPRC']:.4f}  AUROC: {train_res['AUROC']:.4f}")
             print(f"[Valid] Loss: {val_res['loss']:.4f}  SE: {val_res['SE']:.4f}  SP: {val_res['SP']:.4f}  ACC: {val_res['acc']:.4f}  "
-                f"F1: {val_res['DC']:.4f}  PC: {val_res['PC']:.4f}  IOU: {val_res['JS']:.4f}  PR: {val_res['AUPRC']:.4f}  AUROC: {val_res['AUROC']:.4f}")
+                  f"F1: {val_res['DC']:.4f}  PC: {val_res['PC']:.4f}  IOU: {val_res['JS']:.4f}  PR: {val_res['AUPRC']:.4f}  AUROC: {val_res['AUROC']:.4f}")
 
             #保存当前epoch的模型（权重、优化器状态和epoch，可以在下一次接着训练）
             state = {'net': self.unet.state_dict(), 'optimizer': self.optimizer.state_dict(), 'epoch': epoch}
             torch.save(state, join(self.model_path,f"{self.model_type}_latest.pth"))
             trigger += 1
-            # score = val_res['AUPRC']#0.2*val_res['JS'] + 0.3*val_res['AUPRC']+ 0.5*val_res['DC']        #IOU、SE和F1分别占比为0.2、0.3和0.5
-            #
-            # if score > best['score']:
-            #     best['score'] = score
-            #     best['epoch'] = epoch
-            #     trigger = 0
-            #     torch.save(state, join(self.model_path, f"{self.model_type}_best.pth"))
-            #     print(f"📌 Best model saved at epoch {epoch}, score={best['score']:.4f}")
-            #
-            # if trigger >= self.early_stop:
-            #     print("=> early stopping")
-            #     break
+            score =  0.5*val_res['AUPRC']+ 0.5*val_res['DC']        #IOU、SE和F1分别占比为0.2、0.3和0.5
+
+            if score > best['score']:
+                best['score'] = score
+                best['epoch'] = epoch
+                trigger = 0
+                torch.save(state, join(self.model_path, f"{self.model_type}_best.pth"))
+                print(f"📌 Best model saved at epoch {epoch}, score={best['score']:.4f}")
+
+            if trigger >= self.early_stop:
+                print("=> early stopping")
+                break
 
         torch.save(state, join(self.model_path, f"{self.model_type}_best.pth"))
+
     def test(self):
         """
         测试接口：在 test_loader 上评估已保存的最佳模型，并保存预测图与指标。
         args.device 应与训练时保持一致，例如 'cuda:0' 或 'cpu'。
         """
         # 1. 加载最优模型参数
-        best_path = join(self.model_path, f"{self.model_type}_best.pth")
+        best_path = join(self.model_path, f"{self.model_type}_latest.pth")
         assert os.path.exists(best_path), f"找不到最佳模型文件: {best_path}"
         print(f"==> Loading best model from {best_path}")
         checkpoint = torch.load(best_path, map_location=self.device)
