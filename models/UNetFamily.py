@@ -232,10 +232,10 @@ class UNet(nn.Module):
         enc3_feat, enc3_down = self.enc3(enc2_down)
         enc4_feat, enc4_down = self.enc4(enc3_down)
         # 中心块
-        center = cp.checkpoint(self.center, enc4_down)
+        center = self.center(enc4_down)
         # 解码器
-        dec4 = cp.checkpoint(self.dec4, center, enc4_feat)
-        dec3 = cp.checkpoint(self.dec3, dec4, enc3_feat)
+        dec4 = self.dec4(center, enc4_feat)
+        dec3 = self.dec3(dec4, enc3_feat)
         dec2 = self.dec2(dec3, enc2_feat)
         dec1 = self.dec1(dec2, enc1_feat)
         # 最终输出
